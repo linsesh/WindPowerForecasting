@@ -36,7 +36,7 @@ class PandasBatchGenerator(object):
                     y[i, :, :] = self.data.loc[self.current_idx + 1:self.current_idx + self.num_steps, self.target_col].values
                 except Exception as e:
                     print(e)
-                    #self.idx_errors.append(self.current_idx)
+                    self.idx_errors.append(self.current_idx)
                     i = i - 1
 
                 self.current_idx += self.skip_step
@@ -51,6 +51,13 @@ def separate_set_seq(df, train_fraction=70, valid_fraction=10, test_fraction=20)
 
     return df[:idx_train].reset_index(), df[idx_train:idx_valid].reset_index(), df[idx_valid:].reset_index()
 
+def get_config(df):
+    return {
+    "batch_size": 100,
+    "attr": list(df.drop("Time", 1)),
+    "time_steps": 6,
+    "num_epochs": 1}
+
 
 def normalize(df):
     df_norm = (df - df.mean()) / (df.max() - df.min())
@@ -61,12 +68,37 @@ def normalize(df):
     #print(df_std.std())
     return df_std
 
+#def test_model(model, test_set):
+
+def get_trained_model(training_set, validation_set, config, loadFile=None):
+    if loadFile:
+        return load_model(loadFile)
+
+    training_generator = PandasBatchGenerator(training_set, config["time_steps"], config["attr"],
+                                              ["Power average [kW]"], config["batch_size"], config["time_steps"])
+    validation_generator = PandasBatchGenerator(validation_set, config["time_steps"], config["attr"],
+                                                ["Power average [kW]"], config["batch_size"], config["time_steps"])
+
+    model = Sequential()
+    model.add(LSTM(100, return_sequences=True, input_shape=(config["time_steps"], len(config["attr"]))))
+    model.add(Dense(1))
+#    model.add(Activation("tanh"))
+
+    model.compile(loss='mean_squared_error', optimizer='adam')
+    print(model.summary())
+    model.fit_generator(training_generator.generate(), len(training_set) // config["batch_size"], config["num_epochs"],
+                        validation_data=validation_generator.generate(),
+                        validation_steps=len(validation_set) // config["batch_size"])
+    print("nb inputs skipped = %d" % (len(training_generator.idx_errors)))
+
+    return model
+
 def main():
     if len(sys.argv) == 1:
         print("usage : %s pathtodataset" % (sys.argv[0]))
         return 1
     try:
-        df = pd.read_excel(sys.argv[1], nrows=10000)
+        df = pd.read_excel(sys.argv[1])
     except Exception as e:
         print("Could not open %s" % (sys.argv[1]))
         print(e)
@@ -79,25 +111,19 @@ def main():
 
     training_set, validation_set, test_set = separate_set_seq(df_mod)
 
-    batch_size = 100
-    attr = list(df_mod.drop("Time", 1))
-    time_steps = 6
-    num_epochs = 1
-    training_generator = PandasBatchGenerator(training_set, time_steps, attr, ["Power average [kW]"], batch_size, time_steps)
-    validation_generator = PandasBatchGenerator(validation_set, time_steps, attr, ["Power average [kW]"], batch_size, time_steps)
+    config = get_config(df_mod)
 
-    model = Sequential()
-    model.add(LSTM(100, return_sequences=True, input_shape=(time_steps, len(attr))))
-    model.add(Dense(1))
-    model.add(Activation("tanh"))
+    model = get_trained_model(training_set, validation_set, config)
 
-    model.compile(loss='mean_squared_error', optimizer='adam')
-    print(model.summary())
-    model.fit_generator(training_generator.generate(), len(training_set) // batch_size, num_epochs,
-                        validation_data=validation_generator.generate(),
-                        validation_steps=len(validation_set) // batch_size)
-    print("nb inputs skipped = %d" % (len(training_generator.idx_errors)))
-    #model.evaluate_generator(generator, )
+    #test_model(model, test_set)
+
+    test_generator = PandasBatchGenerator(test_set, config["time_steps"], config["attr"],
+                                          ["Power average [kW]"], 1, config["time_steps"])
+    inp, out = next(test_generator.generate())
+    y = model.predict(inp, verbose=1)
+    print(y)
+    print(out)
+    model.save("full_model.h5")
 
 if __name__ == "__main__":
     main()
