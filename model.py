@@ -2,6 +2,12 @@ import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from keras.models import Sequential, load_model
+from keras.layers import Dense, Activation
+from keras.layers import LSTM
+from keras.optimizers import Adam
+
+
 
 class PandasBatchGenerator(object):
 
@@ -14,23 +20,28 @@ class PandasBatchGenerator(object):
 
         self.current_idx = 0
         self.skip_step = skip_step
+        self.idx_errors = []
+
 
     def generate(self):
         x = np.zeros((self.batch_size, self.num_steps, len(self.attr_col)))
-        y = np.zeros((self.batch_size, self.num_steps))
+        y = np.zeros((self.batch_size, self.num_steps, 1))
         while True:
-            for i in range(self.batch_size):
+            i = 0
+            while i < self.batch_size:
                 if self.current_idx + self.num_steps >= len(self.data):
                     self.current_idx = 0
 
                 try:
                     x[i, :, :] = self.data.loc[self.current_idx:self.current_idx + self.num_steps - 1, self.attr_col].values
-                    y[i, :] = self.data.loc[self.current_idx + 1:self.current_idx + self.num_steps, self.target_col].values.reshape(self.num_steps)
+                    y[i, :, :] = self.data.loc[self.current_idx + 1:self.current_idx + self.num_steps, self.target_col].values
                 except Exception as e:
                     print(e)
-                    print(self.data[self.current_idx:])
+                    self.idx_errors.append(self.current_idx)
+                    i = i - 1
 
                 self.current_idx += self.skip_step
+                i = i + 1
             yield x, y
 
 def normalize(df):
@@ -53,13 +64,27 @@ def main():
         print(e)
         return 1
 
-    df = df[0:10000]
+    df = df[0:50000]
     df_mod = df.drop("Time", 1).apply(pd.to_numeric, 1, errors="coerce")
-    df_mod.dropna(inplace=True)
     df_mod = normalize(df_mod)
     df_mod = df_mod.assign(Time=df["Time"])
+    df_mod.dropna(inplace=True)
 
-    generator = PandasBatchGenerator(df_mod, 6, list(df_mod.drop("Time", 1)), ["Power average [kW]"], 50, 6)
+    batch_size = 100
+    attr = list(df_mod.drop("Time", 1))
+    time_steps = 6
+    generator = PandasBatchGenerator(df_mod, time_steps, attr, ["Power average [kW]"], batch_size, time_steps)
+
+    model = Sequential()
+    model.add(LSTM(100, return_sequences=True, input_shape=(time_steps, len(attr))))
+    model.add(Dense(1))
+    model.add(Activation("tanh"))
+
+    model.compile(loss='mean_squared_error', optimizer='adam')
+    print(model.summary())
+    model.fit_generator(generator.generate(), len(df_mod)//batch_size, 1)
+    print("nb inputs skipped = %d" % (len(generator.idx_errors)))
+    #model.evaluate_generator(generator, )
 
 if __name__ == "__main__":
     main()
