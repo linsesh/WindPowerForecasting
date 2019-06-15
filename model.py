@@ -8,7 +8,6 @@ from keras.layers import LSTM
 from keras.optimizers import Adam
 
 
-
 class PandasBatchGenerator(object):
 
     def __init__(self, data, num_steps, attr_column, target_column, batch_size, skip_step):
@@ -37,12 +36,21 @@ class PandasBatchGenerator(object):
                     y[i, :, :] = self.data.loc[self.current_idx + 1:self.current_idx + self.num_steps, self.target_col].values
                 except Exception as e:
                     print(e)
-                    self.idx_errors.append(self.current_idx)
+                    #self.idx_errors.append(self.current_idx)
                     i = i - 1
 
                 self.current_idx += self.skip_step
                 i = i + 1
             yield x, y
+
+def separate_set_seq(df, train_fraction=70, valid_fraction=10, test_fraction=20):
+    """Separate set without sampling. fraction params must sum up to 100"""
+    len_ = len(df)
+    idx_train = len_ * train_fraction // 100
+    idx_valid = idx_train + len_ * valid_fraction // 100
+
+    return df[:idx_train].reset_index(), df[idx_train:idx_valid].reset_index(), df[idx_valid:].reset_index()
+
 
 def normalize(df):
     df_norm = (df - df.mean()) / (df.max() - df.min())
@@ -58,22 +66,25 @@ def main():
         print("usage : %s pathtodataset" % (sys.argv[0]))
         return 1
     try:
-        df = pd.read_excel(sys.argv[1])
+        df = pd.read_excel(sys.argv[1], nrows=10000)
     except Exception as e:
         print("Could not open %s" % (sys.argv[1]))
         print(e)
         return 1
 
-    df = df[0:50000]
     df_mod = df.drop("Time", 1).apply(pd.to_numeric, 1, errors="coerce")
     df_mod = normalize(df_mod)
     df_mod = df_mod.assign(Time=df["Time"])
     df_mod.dropna(inplace=True)
 
+    training_set, validation_set, test_set = separate_set_seq(df_mod)
+
     batch_size = 100
     attr = list(df_mod.drop("Time", 1))
     time_steps = 6
-    generator = PandasBatchGenerator(df_mod, time_steps, attr, ["Power average [kW]"], batch_size, time_steps)
+    num_epochs = 1
+    training_generator = PandasBatchGenerator(training_set, time_steps, attr, ["Power average [kW]"], batch_size, time_steps)
+    validation_generator = PandasBatchGenerator(validation_set, time_steps, attr, ["Power average [kW]"], batch_size, time_steps)
 
     model = Sequential()
     model.add(LSTM(100, return_sequences=True, input_shape=(time_steps, len(attr))))
@@ -82,8 +93,10 @@ def main():
 
     model.compile(loss='mean_squared_error', optimizer='adam')
     print(model.summary())
-    model.fit_generator(generator.generate(), len(df_mod)//batch_size, 1)
-    print("nb inputs skipped = %d" % (len(generator.idx_errors)))
+    model.fit_generator(training_generator.generate(), len(training_set) // batch_size, num_epochs,
+                        validation_data=validation_generator.generate(),
+                        validation_steps=len(validation_set) // batch_size)
+    print("nb inputs skipped = %d" % (len(training_generator.idx_errors)))
     #model.evaluate_generator(generator, )
 
 if __name__ == "__main__":
