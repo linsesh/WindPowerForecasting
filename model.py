@@ -62,11 +62,12 @@ def separate_set_seq(df, train_fraction=70, valid_fraction=10, test_fraction=20)
 
 def get_config(df):
     return {
-    "batch_size": 100,
+    "batch_size": 50,
     "attr": list(df.drop("Time", 1)),
-    "time_steps": 6,
-    "num_epochs": 3,
-    "skip_steps": 1
+    "time_steps": 12,
+    "num_epochs": 30,
+    "skip_steps": 1,
+    "hidden_size": 500
     }
 
 
@@ -91,8 +92,10 @@ def get_trained_model(training_set, validation_set, config, loadFile=None, plotL
                                                 ["Power_average"], config["batch_size"], config["skip_steps"])
 
     model = Sequential()
-    model.add(LSTM(500, input_shape=(config["time_steps"], len(config["attr"])), unroll=True, return_sequences=True))
-    model.add(LSTM(500, unroll=True))
+    model.add(LSTM(config["hidden_size"], input_shape=(config["time_steps"], len(config["attr"])), unroll=True, return_sequences=True))
+    model.add(LSTM(config["hidden_size"], unroll=True))
+    model.add(Dense(units=100))
+    model.add(Activation("tanh"))
     #model.add(LSTM(500, stateful=True, batch_input_shape=(config["batch_size"], config["time_steps"], len(config["attr"]))))
     #model.add(LSTM(500, stateful=True))
     model.add(Dense(1))
@@ -100,9 +103,9 @@ def get_trained_model(training_set, validation_set, config, loadFile=None, plotL
 
     model.compile(loss='mean_squared_error', optimizer='adam')
     print(model.summary())
-    history = model.fit_generator(training_generator.generate(), len(training_set) // (config["batch_size"]*config["skip_steps"]),
+    history = model.fit_generator(training_generator.generate(), len(training_set) // (config["batch_size"]*(config["time_steps"] + config["skip_steps"])),
                                   config["num_epochs"], validation_data=validation_generator.generate(),
-                                  validation_steps=len(validation_set) // (config["batch_size"]*config["skip_steps"]), shuffle=False)
+                                  validation_steps=len(validation_set) // (config["batch_size"]*(config["time_steps"] + config["skip_steps"])), shuffle=False)
     print("nb inputs skipped = %d" % (len(training_generator.idx_errors)))
     if plotLoss:
         plt.plot(history.history['loss'])
@@ -111,7 +114,7 @@ def get_trained_model(training_set, validation_set, config, loadFile=None, plotL
         plt.ylabel('Loss')
         plt.xlabel('Epoch')
         plt.legend(['Train', 'Test'], loc='upper left')
-        plt.show()
+        plt.savefig("/cluster/home/arc/bjl31/loss.png")
 
     return model
 
@@ -129,7 +132,10 @@ def main():
     df_mod = df.drop("Time", 1).apply(pd.to_numeric, 1, errors="coerce")
     df_mod = normalize(df_mod.drop("Power average [kW]", 1))
     df_mod = df_mod.assign(Time=df["Time"], Power_average=df["Power average [kW]"])
+    print(df_mod)
     df_mod.dropna(inplace=True)
+    print(df_mod)
+    exit(0)
 
     training_set, validation_set, test_set = separate_set_seq(df_mod)
 
@@ -141,6 +147,12 @@ def main():
 
     test_generator = PandasBatchGenerator(test_set, config["time_steps"], config["attr"],
                                           ["Power_average"], 1, config["skip_steps"])
+    test_generator_bis = PandasBatchGenerator(test_set, config["time_steps"], config["attr"],
+                                          ["Power_average"], 1, config["skip_steps"])
+
+    ev = model.evaluate_generator(test_generator_bis.generate(), len(test_set) // (config["batch_size"]*config["skip_steps"]))
+    print("error on test set: %d" % ev)
+
     for i in range(1):
         pd.set_option('display.max_columns', 500)
         pd.set_option('display.width', 1000)
@@ -149,7 +161,7 @@ def main():
         y = model.predict(inp, verbose=1)
         print(y)
         print(out)
-    #model.save("full_model.h5")
+    model.save("/cluster/home/arc/bjl31/full_model.h5")
 
 if __name__ == "__main__":
     main()
