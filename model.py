@@ -103,9 +103,9 @@ def get_trained_model(training_set, validation_set, config, loadFile=None, plotL
 
     model.compile(loss='mean_squared_error', optimizer='adam')
     print(model.summary())
-    history = model.fit_generator(training_generator.generate(), len(training_set) // (config["batch_size"]*(config["time_steps"] + config["skip_steps"])),
+    history = model.fit_generator(training_generator.generate(), len(training_set) // ((config["batch_size"]*config["skip_steps"]) + config["time_steps"]),
                                   config["num_epochs"], validation_data=validation_generator.generate(),
-                                  validation_steps=len(validation_set) // (config["batch_size"]*(config["time_steps"] + config["skip_steps"])), shuffle=False)
+                                  validation_steps=len(validation_set) // ((config["batch_size"]*config["skip_steps"]) + config["time_steps"]), shuffle=False)
     print("nb inputs skipped = %d" % (len(training_generator.idx_errors)))
     if plotLoss:
         plt.plot(history.history['loss'])
@@ -132,10 +132,7 @@ def main():
     df_mod = df.drop("Time", 1).apply(pd.to_numeric, 1, errors="coerce")
     df_mod = normalize(df_mod.drop("Power average [kW]", 1))
     df_mod = df_mod.assign(Time=df["Time"], Power_average=df["Power average [kW]"])
-    print(df_mod)
     df_mod.dropna(inplace=True)
-    print(df_mod)
-    exit(0)
 
     training_set, validation_set, test_set = separate_set_seq(df_mod)
 
@@ -150,7 +147,7 @@ def main():
     test_generator_bis = PandasBatchGenerator(test_set, config["time_steps"], config["attr"],
                                           ["Power_average"], 1, config["skip_steps"])
 
-    ev = model.evaluate_generator(test_generator_bis.generate(), len(test_set) // (config["batch_size"]*config["skip_steps"]))
+    ev = model.evaluate_generator(test_generator_bis.generate(), len(test_set) // ((config["batch_size"]*config["skip_steps"]) + config["time_steps"]))
     print("error on test set: %d" % ev)
 
     for i in range(1):
