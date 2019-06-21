@@ -65,8 +65,8 @@ def get_config(df):
     "batch_size": 50,
     "attr": list(df.drop("Time", 1)),
     "time_steps": 12,
-    "num_epochs": 30,
-    "skip_steps": 1,
+    "num_epochs": 40,
+    "skip_steps": 6,
     "hidden_size": 500
     }
 
@@ -101,7 +101,7 @@ def get_trained_model(training_set, validation_set, config, loadFile=None, plotL
     model.add(Dense(1))
 #    model.add(Activation("tanh"))
 
-    model.compile(loss='mean_squared_error', optimizer='adam')
+    model.compile(loss='mean_absolute_error', optimizer='adam')
     print(model.summary())
     history = model.fit_generator(training_generator.generate(), len(training_set) // ((config["batch_size"]*config["skip_steps"]) + config["time_steps"]),
                                   config["num_epochs"], validation_data=validation_generator.generate(),
