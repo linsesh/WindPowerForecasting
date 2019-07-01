@@ -7,91 +7,38 @@ from keras.layers import Dense, Activation, Lambda
 from keras.layers import LSTM
 from keras.optimizers import Adam
 from keras.utils import plot_model
-
-
-class PandasBatchGenerator(object):
-
-    def __init__(self, data, num_steps, num_padding, attr_column, target_column, batch_size, skip_step, returnSequence=True):
-        self.data = data
-        self.num_steps = num_steps
-        self.num_padding = num_padding
-        self.batch_size = batch_size
-        self.attr_col = attr_column
-        self.target_col = target_column
-
-        self.current_idx = 0
-        self.skip_step = skip_step
-        self.returnSeq = returnSequence
-        self.idx_errors = []
-
-
-    def generate(self):
-        x = np.zeros((self.batch_size, self.num_steps + self.num_padding, len(self.attr_col)))
-        if not self.returnSeq:
-            y = np.zeros((self.batch_size, 1))
-            raise Exception("not implemented")
-        else:
-            y = np.zeros((self.batch_size, self.num_padding, 1))
-        while True:
-            i = 0
-            while i < self.batch_size:
-                if self.current_idx + self.num_steps >= len(self.data):
-                    self.current_idx = 0
-
-                try:
-                    x[i, :self.num_steps, :] = self.data.loc[self.current_idx:self.current_idx + self.num_steps - 1, self.attr_col].values
-                    if not self.returnSeq:
-                        y[i, 0] = self.data.loc[self.current_idx + self.num_steps, self.target_col].values
-                    else:
-                        #print(self.data.loc[self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1, self.target_col].values[0])
-                        y[i, :, :] = self.data.loc[self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1, self.target_col].values
-                except Exception as e:
-                    print(e)
-                    self.idx_errors.append(self.current_idx)
-                    i = i - 1
-#                print(x[i])
-#                print(y[i])
-
-                self.current_idx += self.skip_step
-                i = i + 1
-            yield x, y
-
-def separate_set_seq(df, train_fraction=70, valid_fraction=10, test_fraction=20):
-    """Separate set without sampling. fraction params must sum up to 100"""
-    len_ = len(df)
-    idx_train = len_ * train_fraction // 100
-    idx_valid = idx_train + len_ * valid_fraction // 100
-
-    return df[:idx_train].reset_index(), df[idx_train:idx_valid].reset_index(), df[idx_valid:].reset_index()
+from batch_generator import PandasBatchGenerator
+from preprocessing import *
 
 def get_config(df):
     return {
     "batch_size": 50,
     "attr": list(df.drop("Time", 1)),
-    "time_steps": 12,
-    "forecast_steps": 6,
-    "num_epochs": 3,
-    "skip_steps": 1,
-    "hidden_size": 500
+    "time_steps": 18, #use 3 last hours
+    "forecast_steps": 12, # to predict 2 next hour
+    "num_epochs": 30,
+    "skip_steps": 6,
+    "hidden_size": 500,
+    "load_file": None
     }
-
-
-def normalize(df):
-    df_norm = (df - df.mean()) / (df.max() - df.min())
-    #print(df_norm.mean())
-    #print(df_norm.std())
-    df_std = (df - df.mean()) / df.std()
-    #print(df_std.mean())
-    #print(df_std.std())
-    return df_std
 
 #def test_model(model, test_set):
 
-def get_trained_model(training_set, validation_set, config, loadFile=None, plotLoss=False):
-    if loadFile:
-        return load_model(loadFile)
+def plot_infos(history):
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('Model loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
+    try:
+        plt.savefig("/cluster/home/arc/bjl31/loss.png")
+    except Exception as e:
+        print(e)
 
-    training_generator = PandasBatchGenerator(training_set, config["time_steps"], config["forecast_steps"], config["attr"],
+def get_trained_model(training_set, validation_set, config, plotLoss=False):
+
+    training_generator =  PandasBatchGenerator(training_set, config["time_steps"], config["forecast_steps"], config["attr"],
                                               ["Power_average"], config["batch_size"], config["skip_steps"])
     validation_generator = PandasBatchGenerator(validation_set, config["time_steps"], config["forecast_steps"], config["attr"],
                                                 ["Power_average"], config["batch_size"], config["skip_steps"])
@@ -102,25 +49,17 @@ def get_trained_model(training_set, validation_set, config, loadFile=None, plotL
     model.add(Lambda(lambda x: x[:, -config["forecast_steps"]:, :]))
     model.add(Dense(units=100))
     model.add(Activation("tanh"))
-    #model.add(LSTM(500, stateful=True, batch_input_shape=(config["batch_size"], config["time_steps"], len(config["attr"]))))
-    #model.add(LSTM(500, stateful=True))
     model.add(Dense(1))
-#    model.add(Activation("tanh"))
 
-    model.compile(loss='mean_absolute_error', optimizer='adam')
+    model.compile(loss='mean_squared_error', optimizer='adam', metrics=["mean_absolute_error"])
     print(model.summary())
     history = model.fit_generator(training_generator.generate(), len(training_set) // ((config["batch_size"]*config["skip_steps"]) + config["time_steps"] + config["forecast_steps"]),
                                   config["num_epochs"], validation_data=validation_generator.generate(),
                                   validation_steps=len(validation_set) // ((config["batch_size"]*config["skip_steps"]) + config["time_steps"] + config["forecast_steps"]), shuffle=False)
     print("nb inputs skipped = %d" % (len(training_generator.idx_errors)))
+
     if plotLoss:
-        plt.plot(history.history['loss'])
-        plt.plot(history.history['val_loss'])
-        plt.title('Model loss')
-        plt.ylabel('Loss')
-        plt.xlabel('Epoch')
-        plt.legend(['Train', 'Test'], loc='upper left')
-        plt.savefig("/cluster/home/arc/bjl31/loss.png")
+        plot_infos(history)
 
     return model
 
@@ -135,34 +74,39 @@ def main():
         print(e)
         return 1
 
-    df_mod = df.drop("Time", 1).apply(pd.to_numeric, 1, errors="coerce")
-    df_mod = normalize(df_mod.drop("Power average [kW]", 1))
-    df_mod = df_mod.assign(Time=df["Time"], Power_average=df["Power average [kW]"])
-    df_mod.dropna(inplace=True)
 
+    df_mod = clean_data(df)
+    df_mod = arrange_data(df_mod)
     training_set, validation_set, test_set = separate_set_seq(df_mod)
 
     config = get_config(df_mod)
 
-    model = get_trained_model(training_set, validation_set, config, plotLoss=True)
+    if config["load_file"] == None:
+        model = get_trained_model(training_set, validation_set, config, plotLoss=True)
+    else:
+        model = load_model(config["load_file"])
+
 
     test_generator = PandasBatchGenerator(test_set, config["time_steps"], config["forecast_steps"], config["attr"],
                                           ["Power_average"], 1, config["skip_steps"])
     test_generator_bis = PandasBatchGenerator(test_set, config["time_steps"], config["forecast_steps"], config["attr"],
                                           ["Power_average"], 1, config["skip_steps"])
 
-    ev = model.evaluate_generator(test_generator_bis.generate(), len(test_set) // ((config["batch_size"]*config["skip_steps"]) + config["time_steps"] + config["forecast_steps"]))
-    print("error on test set: %d" % ev)
+    ev = model.evaluate_generator(test_generator_bis.generate(),
+                                  len(test_set) // ((config["batch_size"]*config["skip_steps"]) + config["time_steps"] + config["forecast_steps"]),
+                                  verbose=1)
+    print("error on test set: [%s]" % ', '.join(map(str, ev)))
 
-    for i in range(1):
+    print("example of prediction :")
+    for i in range(10):
         pd.set_option('display.max_columns', 500)
         pd.set_option('display.width', 1000)
-        print(test_set[test_generator.current_idx:test_generator.current_idx + test_generator.num_steps + test_generator.num_padding + 1])
+        #print(test_set[test_generator.current_idx:test_generator.current_idx + test_generator.num_steps + test_generator.num_padding])
         inp, out = next(test_generator.generate())
         y = model.predict(inp, verbose=1)
         print(y)
         print(out)
-    model.save("/cluster/home/arc/bjl31/full_model.h5")
+    #model.save("/cluster/home/arc/bjl31/full_model.h5")
 
 if __name__ == "__main__":
     main()
@@ -171,3 +115,8 @@ if __name__ == "__main__":
 #df = df.sample(n=10000)
 #df["Wind average [m/s]"].plot(kind="hist")
 #plt.show()
+    #df["Power average [kW]"].plot(kind="hist")
+    #df_mod["Power_average"].plot(kind="hist")
+    ##df.boxplot(column=["Wind average [m/s]"])
+    #plt.show()
+    #exit(0)
