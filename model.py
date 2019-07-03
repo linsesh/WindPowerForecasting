@@ -1,5 +1,5 @@
-import sys
 import pandas as pd
+import sys
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.models import Sequential, load_model
@@ -73,12 +73,7 @@ def main():
     if len(sys.argv) == 1:
         print("usage : %s pathtodataset" % (sys.argv[0]))
         return 1
-    try:
-        df = pd.read_excel(sys.argv[1])
-    except Exception as e:
-        print("Could not open %s" % (sys.argv[1]))
-        print(e)
-        return 1
+    df = read_file(sys.argv[1])
 
     df_mod = arrange_data(df)
     df_mod = clean_data(df_mod)
@@ -104,8 +99,6 @@ def main():
 
     print("example of prediction :")
     for i in range(200):
-        pd.set_option('display.max_columns', 500)
-        pd.set_option('display.width', 1000)
         #print(test_set[test_generator.current_idx:test_generator.current_idx + test_generator.num_steps + test_generator.num_padding])
         inp, out = next(test_generator.generate())
         y = model.predict(inp, verbose=1)

@@ -1,6 +1,14 @@
 import pandas as pd
 from datetime import datetime
 
+def read_file(name):
+    try:
+        df = pd.read_excel(name)
+    except Exception as e:
+        print("Could not open %s" % name)
+        print(e)
+        raise Exception("Failure, closing program")
+    return df
 
 def normalize(df):
     df_norm = (df - df.mean()) / (df.max() - df.min())
