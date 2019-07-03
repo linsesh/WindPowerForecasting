@@ -27,11 +27,11 @@ def separate_set_seq(df, train_fraction=70, valid_fraction=10, test_fraction=20)
 
     return df[:idx_train].reset_index(), df[idx_train:idx_valid].reset_index(), df[idx_valid:].reset_index()
 
-def clean_data(df):
+def clean_data(df, target_var="Power average [kW]"):
     df_mod = df.drop("Time", 1).apply(pd.to_numeric, 1, errors="coerce")
     print(df_mod.isna().sum())
     df_mod = normalize(df_mod)
-    df_mod = df_mod.assign(Time=df["Time"], Power_average_output=df["Power average [kW]"])
+    df_mod = df_mod.assign(Time=df["Time"], target_variable=df[target_var])
     df_mod.dropna(inplace=True)
     return df_mod
 

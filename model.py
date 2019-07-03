@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from keras.models import Sequential, load_model
 from keras.layers import Dense, Activation, Lambda, LSTM
+from keras import regularizers
 from keras.callbacks import LambdaCallback
 from keras.optimizers import Adam
 from keras.utils import plot_model
@@ -13,13 +14,14 @@ from preprocessing import *
 def get_config(df):
     return {
     "batch_size": 50,
-    "attr": list(df.drop(["Time", "Power_average_output"], 1)),
+    "attr": list(df.drop(["Time", "target_variable"], 1)),
     "time_steps": 18, #use 3 last hours
     "forecast_steps": 12, # to predict 2 next hour
     "num_epochs": 20,
     "skip_steps": 6,
     "hidden_size": 500,
-    "load_file": None
+    "load_file": None,
+    "regularizer": regularizers.l1(0.01)
     }
 
 #def test_model(model, test_set):
@@ -39,19 +41,19 @@ def plot_infos(history):
 def get_trained_model(training_set, validation_set, config, plotLoss=False):
 
     training_generator =  PandasBatchGenerator(training_set, config["time_steps"], config["forecast_steps"], config["attr"],
-                                              ["Power_average_output"], config["batch_size"], config["skip_steps"])
+                                              ["target_variable"], config["batch_size"], config["skip_steps"])
     validation_generator = PandasBatchGenerator(validation_set, config["time_steps"], config["forecast_steps"], config["attr"],
-                                                ["Power_average_output"], config["batch_size"], config["skip_steps"])
+                                                ["target_variable"], config["batch_size"], config["skip_steps"])
 
     #inp, out =  next(training_generator.generate())
 
     model = Sequential()
-    model.add(LSTM(config["hidden_size"], input_shape=(config["time_steps"] + config["forecast_steps"], len(config["attr"])), unroll=True, return_sequences=True))
-    model.add(LSTM(config["hidden_size"], unroll=True, return_sequences=True))
+    model.add(LSTM(config["hidden_size"], input_shape=(config["time_steps"] + config["forecast_steps"], len(config["attr"])), unroll=True, return_sequences=True, kernel_regularizer=config["regularizer"]))
+    model.add(LSTM(config["hidden_size"], unroll=True, return_sequences=True, kernel_regularizer=config["regularizer"]))
     model.add(Lambda(lambda x: x[:, -config["forecast_steps"]:, :]))
-    model.add(Dense(units=100))
+    model.add(Dense(units=100, kernel_regularizer=config["regularizer"]))
     model.add(Activation("tanh"))
-    model.add(Dense(1))
+    model.add(Dense(1, kernel_regularizer=config["regularizer"]))
 
     #print_weights = LambdaCallback(on_epoch_end=lambda batch, logs: print(model.layers[0].get_weights()))
 
@@ -76,7 +78,7 @@ def main():
     df = read_file(sys.argv[1])
 
     df_mod = arrange_data(df)
-    df_mod = clean_data(df_mod)
+    df_mod = clean_data(df_mod, "Wind average [m/s]")
     training_set, validation_set, test_set = separate_set_seq(df_mod)
 
     config = get_config(df_mod)
@@ -88,9 +90,9 @@ def main():
 
 
     test_generator = PandasBatchGenerator(test_set, config["time_steps"], config["forecast_steps"], config["attr"],
-                                          ["Power_average_output"], 1, config["skip_steps"])
+                                          ["target_variable"], 1, config["skip_steps"])
     test_generator_bis = PandasBatchGenerator(test_set, config["time_steps"], config["forecast_steps"], config["attr"],
-                                          ["Power_average_output"], 1, config["skip_steps"])
+                                          ["target_variable"], 1, config["skip_steps"])
 
     ev = model.evaluate_generator(test_generator_bis.generate(),
                                   len(test_set) // ((config["batch_size"]*config["skip_steps"]) + config["time_steps"] + config["forecast_steps"]),
