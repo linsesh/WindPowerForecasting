@@ -15,13 +15,13 @@ def get_config(df):
     return {
     "batch_size": 50,
     "attr": list(df.drop(["Time", "target_variable"], 1)),
-    "time_steps": 18, #use 3 last hours
-    "forecast_steps": 12, # to predict 2 next hour
+    "time_steps": 36, #use 6 last hours
+    "forecast_steps": 36, # to predict 6 next hour
     "num_epochs": 20,
     "skip_steps": 6,
     "hidden_size": 500,
     "load_file": None,
-    "regularizer": regularizers.l1(0.01)
+    "regularizer": regularizers.l2(0.01)
     }
 
 #def test_model(model, test_set):
@@ -52,7 +52,7 @@ def get_trained_model(training_set, validation_set, config, plotLoss=False):
     model.add(LSTM(config["hidden_size"], unroll=True, return_sequences=True, kernel_regularizer=config["regularizer"]))
     model.add(Lambda(lambda x: x[:, -config["forecast_steps"]:, :]))
     model.add(Dense(units=100, kernel_regularizer=config["regularizer"]))
-    model.add(Activation("tanh"))
+    model.add(Activation("relu"))
     model.add(Dense(1, kernel_regularizer=config["regularizer"]))
 
     #print_weights = LambdaCallback(on_epoch_end=lambda batch, logs: print(model.layers[0].get_weights()))
@@ -78,7 +78,7 @@ def main():
     df = read_file(sys.argv[1])
 
     df_mod = arrange_data(df)
-    df_mod = clean_data(df_mod, "Wind average [m/s]")
+    df_mod = clean_data(df_mod)
     training_set, validation_set, test_set = separate_set_seq(df_mod)
 
     config = get_config(df_mod)
