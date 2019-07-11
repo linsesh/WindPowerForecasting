@@ -22,7 +22,7 @@ class PandasBatchGenerator(object):
             y = np.zeros((self.batch_size, 1))
             raise Exception("not implemented")
         else:
-            y = np.zeros((self.batch_size, self.num_padding, 1))
+            y = np.zeros((self.batch_size, self.num_padding, len(self.target_col)))
         while True:
             i = 0
             while i < self.batch_size:
@@ -37,6 +37,10 @@ class PandasBatchGenerator(object):
                         #print(self.data.loc[self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1, self.target_col].values[0])
                         y[i, :, :] = self.data.loc[self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1, self.target_col].values
                 except Exception as e:
+                    #print(self.data.loc[
+                    #      self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1,
+                    #      self.target_col].values)
+                    #print(self.target_col)
                     print(e)
                     #print(self.data.loc[self.current_idx:self.current_idx + self.num_steps - 1, self.attr_col].values)
                     #print(self.data.loc[

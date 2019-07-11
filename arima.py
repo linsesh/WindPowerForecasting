@@ -17,10 +17,10 @@ history = [x for x in training_set["target_variable"]]
 test_set = test_set["target_variable"]
 validation_set = validation_set["target_variable"]
 
-model = SARIMAX(history, order=(18,0,0))
+model = SARIMAX(history, order=(18,1,9))
 model_fit = model.fit(disp=0)
 
-real_model = SARIMAX(validation_set, order=(18,0,0))
+real_model = SARIMAX(validation_set, order=(18,1,9))
 res = real_model.filter(model_fit.params)
 
 predictions = []

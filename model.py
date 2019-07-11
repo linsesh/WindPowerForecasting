@@ -11,10 +11,11 @@ from keras.utils import plot_model
 from batch_generator import PandasBatchGenerator
 from preprocessing import *
 
-def get_config(df):
+def get_config(attr, output):
     return {
-    "batch_size": 50,
-    "attr": list(df.drop(["Time", "target_variable"], 1)),
+    "batch_size": 30,
+    "attr": attr,
+    "target_variable": output,
     "time_steps": 36, #use 6 last hours
     "forecast_steps": 36, # to predict 6 next hour
     "num_epochs": 20,
@@ -41,19 +42,19 @@ def plot_infos(history):
 def get_trained_model(training_set, validation_set, config, plotLoss=False):
 
     training_generator =  PandasBatchGenerator(training_set, config["time_steps"], config["forecast_steps"], config["attr"],
-                                              ["target_variable"], config["batch_size"], config["skip_steps"])
+                                              config["target_variable"], config["batch_size"], config["skip_steps"])
     validation_generator = PandasBatchGenerator(validation_set, config["time_steps"], config["forecast_steps"], config["attr"],
-                                                ["target_variable"], config["batch_size"], config["skip_steps"])
+                                                config["target_variable"], config["batch_size"], config["skip_steps"])
 
     #inp, out =  next(training_generator.generate())
-
+    input_shape = (config["time_steps"] + config["forecast_steps"], len(config["attr"]))
     model = Sequential()
-    model.add(LSTM(config["hidden_size"], input_shape=(config["time_steps"] + config["forecast_steps"], len(config["attr"])), unroll=True, return_sequences=True, kernel_regularizer=config["regularizer"]))
+    #model.add(Dense(units=100, kernel_regularizer=config["regularizer"], input_shape=input_shape))
+    #model.add(Activation("relu"))
+    model.add(LSTM(config["hidden_size"], unroll=True, return_sequences=True, kernel_regularizer=config["regularizer"]))
     model.add(LSTM(config["hidden_size"], unroll=True, return_sequences=True, kernel_regularizer=config["regularizer"]))
     model.add(Lambda(lambda x: x[:, -config["forecast_steps"]:, :]))
-    model.add(Dense(units=100, kernel_regularizer=config["regularizer"]))
-    model.add(Activation("relu"))
-    model.add(Dense(1, kernel_regularizer=config["regularizer"]))
+    model.add(Dense(len(config["target_variable"]), kernel_regularizer=config["regularizer"]))
 
     #print_weights = LambdaCallback(on_epoch_end=lambda batch, logs: print(model.layers[0].get_weights()))
 
@@ -77,22 +78,30 @@ def main():
         return 1
     df = read_file(sys.argv[1])
 
-    df_mod = arrange_data(df)
-    df_mod = clean_data(df_mod)
-    training_set, validation_set, test_set = separate_set_seq(df_mod)
+    df = arrange_data(df)
+    output_list = list(df.drop(["Time", "month", "hour", "day"], 1))
+    df, copied_attr = copy_target(df, output_list)
+    pd.set_option('display.max_columns', None)
+    copied_attr.append("Time")
+    attr_list = list(df.drop(copied_attr, 1))
+    df_mod = clean_data(df, attr_list)
+    copied_attr.remove("Time")
 
-    config = get_config(df_mod)
+
+    training_set, validation_set, test_set = separate_set_seq(df_mod, 80, 19, 1)
+
+    config = get_config(attr_list, copied_attr)
 
     if config["load_file"] is None:
         model = get_trained_model(training_set, validation_set, config, plotLoss=True)
     else:
         model = load_model(config["load_file"])
 
-
+    exit(0)
     test_generator = PandasBatchGenerator(test_set, config["time_steps"], config["forecast_steps"], config["attr"],
-                                          ["target_variable"], 1, config["skip_steps"])
+                                          config["target_variable"], 1, config["skip_steps"])
     test_generator_bis = PandasBatchGenerator(test_set, config["time_steps"], config["forecast_steps"], config["attr"],
-                                          ["target_variable"], 1, config["skip_steps"])
+                                          config["target_variable"], 1, config["skip_steps"])
 
     ev = model.evaluate_generator(test_generator_bis.generate(),
                                   len(test_set) // ((config["batch_size"]*config["skip_steps"]) + config["time_steps"] + config["forecast_steps"]),

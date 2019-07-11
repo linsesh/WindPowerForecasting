@@ -27,13 +27,24 @@ def separate_set_seq(df, train_fraction=70, valid_fraction=10, test_fraction=20)
 
     return df[:idx_train].reset_index(), df[idx_train:idx_valid].reset_index(), df[idx_valid:].reset_index()
 
-def clean_data(df, target_var="Power average [kW]"):
-    df_mod = df.drop("Time", 1).apply(pd.to_numeric, 1, errors="coerce")
-    print(df_mod.isna().sum())
+def clean_data(df, columns):
+    pd.set_option('display.width', 2000)
+
+    df_cp = df[[x for x in list(df) if x not in columns]]
+
+    df_mod = df.drop(list(df_cp), 1).apply(pd.to_numeric, 1, errors="coerce")
     df_mod = normalize(df_mod)
-    df_mod = df_mod.assign(Time=df["Time"], target_variable=df[target_var])
+    df_mod = df_mod.join(df_cp)
     df_mod.dropna(inplace=True)
     return df_mod
+
+def copy_target(df, targets):
+    names = {}
+    for t in targets:
+        name = "target_" + t
+        names[name] = df[t]
+    df = df.assign(**names)
+    return df, [*names]
 
 def arrange_data(df):
     df["month"] = df.apply(lambda row: datetime.strptime(row.Time, '%m/%d/%Y  %I:%M %p').month, axis=1)
