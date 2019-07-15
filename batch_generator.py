@@ -2,7 +2,7 @@ import numpy as np
 
 class PandasBatchGenerator(object):
 
-    def __init__(self, data, num_steps, num_padding, attr_column, target_column, batch_size, skip_step, returnSequence=True):
+    def __init__(self, data, num_steps, num_padding, attr_column, target_column, batch_size, skip_step):
         self.data = data
         self.num_steps = num_steps
         self.num_padding = num_padding
@@ -12,16 +12,15 @@ class PandasBatchGenerator(object):
 
         self.current_idx = 0
         self.skip_step = skip_step
-        self.returnSeq = returnSequence
         self.idx_errors = []
 
 
     def generate(self):
-        x = np.zeros((self.batch_size, self.num_steps + self.num_padding, len(self.attr_col)))
-        if not self.returnSeq:
+        if not self.num_padding:
+            x = np.full((self.batch_size, self.num_steps, len(self.attr_col)), 0.0)
             y = np.zeros((self.batch_size, 1))
-            raise Exception("not implemented")
         else:
+            x = np.full((self.batch_size, self.num_steps + self.num_padding, len(self.attr_col)), 0.0)
             y = np.zeros((self.batch_size, self.num_padding, len(self.target_col)))
         while True:
             i = 0
@@ -31,7 +30,7 @@ class PandasBatchGenerator(object):
 
                 try:
                     x[i, :self.num_steps, :] = self.data.loc[self.current_idx:self.current_idx + self.num_steps - 1, self.attr_col].values
-                    if not self.returnSeq:
+                    if not self.num_padding:
                         y[i, 0] = self.data.loc[self.current_idx + self.num_steps, self.target_col].values
                     else:
                         #print(self.data.loc[self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1, self.target_col].values[0])

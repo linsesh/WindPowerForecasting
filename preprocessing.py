@@ -19,6 +19,10 @@ def normalize(df):
     #print(df_std.std())
     return df_std
 
+def min_max(df):
+    df_min = (df - df.min()) / (df.max() - df.min())
+    return df_min
+
 def separate_set_seq(df, train_fraction=70, valid_fraction=10, test_fraction=20):
     """Separate set without sampling. fraction params must sum up to 100"""
     len_ = len(df)
@@ -34,6 +38,7 @@ def clean_data(df, columns):
 
     df_mod = df.drop(list(df_cp), 1).apply(pd.to_numeric, 1, errors="coerce")
     df_mod = normalize(df_mod)
+    #df_mod = min_max(df_mod)
     df_mod = df_mod.join(df_cp)
     df_mod.dropna(inplace=True)
     return df_mod
