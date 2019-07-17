@@ -19,6 +19,20 @@ def normalize(df):
     #print(df_std.std())
     return df_std
 
+#a class wrapping or inheriting dataframe would have been better software engineering
+#pandas df cannot be hashed, so it cant be used as key in a dictionary
+def normalize_from_df(data, df):
+    ret = []
+    if normalize_from_df.dataframes is not None:
+        _cache = normalize_from_df.dataframes
+        ret = [(data[i] - _cache[i][0]) / _cache[i][1] for i in range(len(data))]
+    else:
+        for i in range(len(data)):
+            ret.append((data[i] - df.iloc[:, i].mean()) / df.iloc[:, i].std())
+        normalize_from_df.dataframes = [(df[column].mean(), df[column].std()) for column in df]
+    return ret
+normalize_from_df.dataframes = None
+
 def min_max(df):
     df_min = (df - df.min()) / (df.max() - df.min())
     return df_min

@@ -18,20 +18,20 @@ class PandasBatchGenerator(object):
     def generate(self):
         if not self.num_padding:
             x = np.full((self.batch_size, self.num_steps, len(self.attr_col)), 0.0)
-            y = np.zeros((self.batch_size, 1))
+            y = np.zeros((self.batch_size, len(self.target_col)))
         else:
             x = np.full((self.batch_size, self.num_steps + self.num_padding, len(self.attr_col)), 0.0)
             y = np.zeros((self.batch_size, self.num_padding, len(self.target_col)))
         while True:
             i = 0
             while i < self.batch_size:
-                if self.current_idx + self.num_steps + self.num_padding >= len(self.data):
+                if self.current_idx + self.num_steps + (self.num_padding if self.num_padding else 0) >= len(self.data):
                     self.current_idx = 0
 
                 try:
                     x[i, :self.num_steps, :] = self.data.loc[self.current_idx:self.current_idx + self.num_steps - 1, self.attr_col].values
                     if not self.num_padding:
-                        y[i, 0] = self.data.loc[self.current_idx + self.num_steps, self.target_col].values
+                        y[i, :] = self.data.loc[self.current_idx + self.num_steps, self.target_col].values
                     else:
                         #print(self.data.loc[self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1, self.target_col].values[0])
                         y[i, :, :] = self.data.loc[self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1, self.target_col].values
@@ -40,7 +40,7 @@ class PandasBatchGenerator(object):
                     #      self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1,
                     #      self.target_col].values)
                     #print(self.target_col)
-                    print(e)
+                    print("error : " + e)
                     #print(self.data.loc[self.current_idx:self.current_idx + self.num_steps - 1, self.attr_col].values)
                     #print(self.data.loc[
                     #             self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1,
