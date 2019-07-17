@@ -53,9 +53,8 @@ class OutputInputModel(base_model):
         predictions = []
         var_prediction = []
         truth_values = []
+        variables = validation_set[config["target_variable"]]
         skip = config["skip_steps"]
-        #pr = cProfile.Profile()
-        #pr.enable()
         for n in range((len(validation_set) - (config["forecast_steps"] + config["time_steps"])) // skip):
             x = np.zeros((1, config["time_steps"], len(config["attr"])))
             for t in range(config["forecast_steps"]):
@@ -66,8 +65,8 @@ class OutputInputModel(base_model):
                     #print([normalize_from_df(x, validation_set.loc[:, config["target_variable"]]) for x in
                     # predictions[n * 6:n * 6 + t]])
                     x[0, config["time_steps"] - t:, :] =\
-                        np.array([normalize_from_df(x,validation_set.loc[:, config["target_variable"]])
-                                for x in predictions[n * skip:n * skip + t]])
+                        [normalize_from_df(x, variables)
+                                for x in predictions[n * skip:n * skip + t]]
 
                 prediction = model.predict(x)
                 predictions.append(prediction[0])
@@ -83,10 +82,6 @@ class OutputInputModel(base_model):
         print('Test MSE: %.3f' % error)
         mae = mean_absolute_error(truth_values, var_prediction)
         print('Test MAE: %.3f' % mae)
-        #pr.disable()
-        # after your program ends
-        #pr.print_stats(sort="calls")
-        #pr.print_stats(sort="cumulative")
 
 
 #if t == 35:

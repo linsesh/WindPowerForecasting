@@ -5,6 +5,7 @@ from preprocessing import *
 from PaddingModel import PaddingModel
 from OutputInputModel import OutputInputModel
 from keras.models import load_model
+import cProfile
 
 
 def get_config(attr, output):
@@ -47,8 +48,12 @@ def main():
     if config["load_file"] is None:
         model = OutputInputModel(config)
         model.train(training_set, validation_set, plotLoss=False)
+        #apr = cProfile.Profile()
+        #pr.enable()
         model.output_as_input_testing(validation_set)
-
+        #pr.disable()
+        # after your program ends
+        #pr.print_stats(sort="line")
         exit(0)
 
         model.save("/cluster/home/arc/bjl31/full_model.h5")
