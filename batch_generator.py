@@ -29,22 +29,16 @@ class PandasBatchGenerator(object):
                     self.current_idx = 0
 
                 try:
-                    x[i, :self.num_steps, :] = self.data.loc[self.current_idx:self.current_idx + self.num_steps - 1, self.attr_col].values
+                    x[i, :self.num_steps, :] = self.data.loc[self.current_idx:self.current_idx + self.num_steps - 1, self.attr_col].to_numpy()
                     if not self.num_padding:
-                        y[i, :] = self.data.loc[self.current_idx + self.num_steps, self.target_col].values
+                        y[i, :] = self.data.loc[self.current_idx + self.num_steps, self.target_col].to_numpy()
                     else:
-                        #print(self.data.loc[self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1, self.target_col].values[0])
-                        y[i, :, :] = self.data.loc[self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1, self.target_col].values
+                        #print(self.data.loc[self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1, self.target_col].to_numpy()[0])
+                        y[i, :, :] = self.data.loc[self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1, self.target_col].to_numpy()
                 except Exception as e:
-                    #print(self.data.loc[
-                    #      self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1,
-                    #      self.target_col].values)
+                    #      self.target_col].to_numpy())
                     #print(self.target_col)
-                    print("error : " + e)
-                    #print(self.data.loc[self.current_idx:self.current_idx + self.num_steps - 1, self.attr_col].values)
-                    #print(self.data.loc[
-                    #             self.current_idx + self.num_steps:self.current_idx + self.num_steps + self.num_padding - 1,
-                    #             self.target_col].values)
+                    print("error : " + str(e))
                     self.idx_errors.append(self.current_idx)
                     exit(0)
                     i = i - 1

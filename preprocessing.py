@@ -43,10 +43,9 @@ def separate_set_seq(df, train_fraction=70, valid_fraction=10, test_fraction=20)
     idx_train = len_ * train_fraction // 100
     idx_valid = idx_train + len_ * valid_fraction // 100
 
-    return df[:idx_train].reset_index(), df[idx_train:idx_valid].reset_index(), df[idx_valid:].reset_index()
+    return df[:idx_train].reset_index(drop=True), df[idx_train:idx_valid].reset_index(drop=True), df[idx_valid:].reset_index(drop=True)
 
 def clean_data(df, columns):
-    pd.set_option('display.width', 2000)
 
     df_cp = df[[x for x in list(df) if x not in columns]]
 
@@ -54,6 +53,7 @@ def clean_data(df, columns):
     df_mod = normalize(df_mod)
     #df_mod = min_max(df_mod)
     df_mod = df_mod.join(df_cp)
+    print(df_mod.isna().sum())
     df_mod.dropna(inplace=True)
     return df_mod
 
