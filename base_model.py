@@ -56,29 +56,35 @@ class base_model:
                                       verbose=1)
         print("error on test set: [%s]" % ', '.join(map(str, ev)))
 
-    def test_one_variable_mutivariate_model(self, validation_set, variable_to_test):
+    def test_variables_mutivariate_model(self, validation_set, variables_to_test):
         model = self.model
         config = self.config
         skip = config["skip_steps"]
-        predictions = []
-        observations = []
+        predictions = {}
+        observations = {}
+        for x in variables_to_test:
+            predictions[x] = []
+            observations[x] = []
+
         for n in range((len(validation_set) - config["forecast_steps"] - config["time_steps"]) // skip):
             x = np.full((1, config["forecast_steps"] + config["time_steps"], len(config["attr"])), 0.0)
             x[0,:config["time_steps"],:] = validation_set.loc[n * skip:n * skip + config["time_steps"] - 1, config["attr"]]
             output = model.predict(x)
             for t in range(config["forecast_steps"]):
-                yhat = output[0][t][config["target_variable"].index(variable_to_test)]
-                predictions.append(yhat)
-                obs = validation_set.loc[n * skip + t, variable_to_test]
-                observations.append(obs)
+                for variable in variables_to_test:
+                    yhat = output[0][t][config["target_variable"].index(variable)]
+                    predictions[variable].append(yhat)
+                    obs = validation_set.loc[n * skip + t, variable]
+                    observations[variable].append(obs)
                 #print('predicted=%f, expected=%f' % (yhat, obs))
 
-        error = mean_squared_error(observations, predictions)
-        print('Test MSE: %.3f' % error)
-        mae = mean_absolute_error(observations, predictions)
-        print('Test MAE: %.3f' % mae)
-        order = abs((mae / validation_set[variable_to_test].mean()) * 100)
-        print("Error of order : %d%%" % order)
+        for x in variables_to_test:
+            error = mean_squared_error(observations[x], predictions[x])
+            print('Test MSE: %.3f' % error)
+            mae = mean_absolute_error(observations[x], predictions[x])
+            print('Test MAE: %.3f' % mae)
+            order = abs((mae / validation_set[x].mean()) * 100)
+            print("Error of order : %d%%" % order)
 
     def save(self, path):
         self.model.save(path)

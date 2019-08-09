@@ -6,6 +6,7 @@ from PaddingModel import PaddingModel
 from OutputInputModel import OutputInputModel
 from keras.models import load_model
 import cProfile
+from time import gmtime, strftime
 
 #to put in a json file, more pratical
 def get_config(attr, output):
@@ -13,9 +14,9 @@ def get_config(attr, output):
     "batch_size": 35,
     "attr": attr,
     "target_variable": output,
-    "time_steps": 108, #use 12 last hours
+    "time_steps": 36, #use 12 last hours
     "forecast_steps": 72, # to predict 6 next hour
-    "num_epochs": 15,
+    "num_epochs": 20,
     "skip_steps": 6,
     "hidden_size": 500,
     "load_file": None,
@@ -26,13 +27,19 @@ def main():
     if len(sys.argv) == 1:
         print("usage : %s pathtodataset" % (sys.argv[0]))
         return 1
+
+    timetoday = (strftime("%Y-%m-%d_%H:%M:%S", gmtime()))
+    print("run of %s" % (timetoday))
+
     df = read_file(sys.argv[1])
 
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', 2000)
 
+    #df = collapse_data(df, window=6)
     df = arrange_data(df)
-    output_list = list(df.drop(["Time", "month", "hour", "day"], 1))
+    output_list = ["Wind average [m/s]"]
+    #output_list = list(df.drop(["Time", "month", "hour", "day"], 1))
     #output_list = list(df.drop(["Time"], 1))
 
     df, copied_attr = copy_target(df, output_list)
@@ -53,11 +60,11 @@ def main():
 
     if config["load_file"] is None:
         model = PaddingModel(config)
-        model.train(training_set, validation_set, plotLoss=False)
+        model.train(training_set, validation_set, plotLoss=True)
         #apr = cProfile.Profile()
         #pr.enable()
-        model.test_one_variable_mutivariate_model(validation_set, "target_Wind average [m/s]")
-        model.save("/cluster/home/arc/bjl31/propre/twelve_twelve.h5")
+        model.test_variables_mutivariate_model(validation_set, ["target_Wind average [m/s]"])
+        model.save("/cluster/home/arc/bjl31/propre/model_of%s.h5" % timetoday)
         #model.output_as_input_testing(validation_set)
         #pr.disable()
         # after your program ends

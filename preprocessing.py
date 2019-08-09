@@ -45,6 +45,34 @@ def separate_set_seq(df, train_fraction=70, valid_fraction=10, test_fraction=20)
 
     return df[:idx_train].reset_index(drop=True), df[idx_train:idx_valid].reset_index(drop=True), df[idx_valid:].reset_index(drop=True)
 
+def collapse_data(df, window):
+    """averages window size data into one row"""
+    index = 0
+    new_df = pd.DataFrame()
+    cols = [x for x in list(df.columns) if x not in ["Nacelle pos. [°] (Wind direction)", "Time"]]
+    while index + window < len(df):
+        collapsed_row = df.loc[index:index + window - 1, cols].mean()
+        wdirs = df.loc[index:index + window - 1, "Nacelle pos. [°] (Wind direction)"].to_numpy()
+        sector4 = True if next((elem for elem in wdirs if elem > 270), None) is not None else False
+        sum = 0
+        for i in range(window):
+            sum += wdirs[i]
+            if sector4 and wdirs[i] < 180:
+                sum += 360
+        sum /= window
+        if sum > 360:
+            sum -= 360
+        collapsed_row.loc["Nacelle pos. [°] (Wind direction)"] = sum
+        collapsed_row.loc["Time"] = df.loc[index + window // 2, "Time"]
+        new_df = new_df.append(collapsed_row, ignore_index=True)
+        index += window
+    new_df = new_df[df.columns.to_list()] #reorder indexes of columns
+    print(df.loc[:, "Nacelle pos. [°] (Wind direction)"].mean())
+    print(new_df.loc[:, "Nacelle pos. [°] (Wind direction)"].mean())
+    print(df)
+    print(new_df)
+    return new_df
+
 def clean_data(df, columns):
 
     df_cp = df[[x for x in list(df) if x not in columns]]

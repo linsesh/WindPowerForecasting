@@ -3,23 +3,24 @@ import numpy as np
 
 class RandomBatchGenerator(object):
 
-    def __init__(self, data, num_steps, num_padding, attr_column, target_column, batch_size, skip_step):
+    def __init__(self, data, num_steps, num_padding, attr_column, target_column, batch_size, fill=0.0):
         self.data = data
         self.num_steps = num_steps
         self.num_padding = num_padding
         self.batch_size = batch_size
         self.attr_col = attr_column
         self.target_col = target_column
+        self.fill = fill
 
         self.idx_errors = []
 
 
     def generate(self):
         if not self.num_padding:
-            x = np.full((self.batch_size, self.num_steps, len(self.attr_col)), 0.0)
+            x = np.full((self.batch_size, self.num_steps, len(self.attr_col)), self.fill)
             y = np.zeros((self.batch_size, len(self.target_col)))
         else:
-            x = np.full((self.batch_size, self.num_steps + self.num_padding, len(self.attr_col)), 0.0)
+            x = np.full((self.batch_size, self.num_steps + self.num_padding, len(self.attr_col)), self.fill)
             y = np.zeros((self.batch_size, self.num_padding, len(self.target_col)))
         while True:
             i = 0
