@@ -4,6 +4,7 @@ from keras import regularizers
 from preprocessing import *
 from PaddingModel import PaddingModel
 from OutputInputModel import OutputInputModel
+from PersistenceModel import PersistenceModel
 from keras.models import load_model
 import cProfile
 from time import gmtime, strftime
@@ -16,7 +17,7 @@ def get_config(attr, output):
     "target_variable": output,
     "time_steps": 36, #use 12 last hours
     "forecast_steps": 72, # to predict 6 next hour
-    "num_epochs": 15,
+    "num_epochs": 20,
     "skip_steps": 6,
     "hidden_size": 500,
     "load_file": None,
@@ -59,12 +60,12 @@ def main():
     config = get_config(attr_list, copied_attr)
 
     if config["load_file"] is None:
-        model = PaddingModel(config)
-        model.train(training_set, validation_set, plotLoss=True)
+        model = PersistenceModel(config)
+        #model.train(training_set, validation_set, plotLoss=True)
         #apr = cProfile.Profile()
         #pr.enable()
-        model.test_variables_mutivariate_model(validation_set, ["target_Wind average [m/s]"], "/cluster/home/arc/bjl31/propre/predicted-truth-%s" % (timetoday))
-        model.save("/cluster/home/arc/bjl31/propre/model_of-%s.h5" % timetoday)
+        model.test_variables_mutivariate_model(validation_set, ["target_Wind average [m/s]", "target_Power average [kW]"], "/cluster/home/arc/bjl31/propre/predicted-truth-%s" % (timetoday))
+        #model.save("/cluster/home/arc/bjl31/propre/model_of-%s.h5" % timetoday)
         #model.output_as_input_testing(validation_set)
         #pr.disable()
         # after your program ends
