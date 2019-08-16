@@ -79,17 +79,20 @@ class base_model:
                     obs = validation_set.loc[n * skip + t, variable]
                     observations[variable].append(obs)
                 #print('predicted=%f, expected=%f' % (yhat, obs))
-
+        ret = []
         for x in variables_to_test:
-            error = mean_squared_error(observations[x], predictions[x])
-            print('Test MSE: %.3f' % error)
+            mse = mean_squared_error(observations[x], predictions[x])
+            print('Test MSE: %.3f' % mse)
             mae = mean_absolute_error(observations[x], predictions[x])
             print('Test MAE: %.3f' % mae)
             order = abs((mae / validation_set[x].mean()) * 100)
             print("Error of order : %d%%" % order)
             idx = randrange(len(observations[x]))
             idx = idx - 72 if idx + 72 > len(observations[x]) else idx
-            plot_predicted_vs_truth(predictions[x][idx:idx+72], observations[x][idx:idx+72], validation_set[x].min(), validation_set[x].max(), plotName + x)
+            ret.append((mae, mse))
+            #plot_predicted_vs_truth(predictions[x][idx:idx+72], observations[x][idx:idx+72], validation_set[x].min(), validation_set[x].max(), plotName)
+        return ret
+
 
     def save(self, path):
         self.model.save(path)

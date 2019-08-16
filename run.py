@@ -8,6 +8,7 @@ from PersistenceModel import PersistenceModel
 from keras.models import load_model
 import cProfile
 from time import gmtime, strftime
+import numpy as np
 
 #to put in a json file, more pratical
 def get_config(attr, output):
@@ -17,8 +18,8 @@ def get_config(attr, output):
     "target_variable": output,
     "time_steps": 36, #use 12 last hours
     "forecast_steps": 72, # to predict 6 next hour
-    "num_epochs": 20,
-    "skip_steps": 6,
+    "num_epochs": 8,
+    "skip_steps": 5,
     "hidden_size": 500,
     "load_file": None,
     "regularizer": regularizers.l2(0.01) #for now
@@ -48,29 +49,45 @@ def main():
     copied_attr.append("Time")
     attr_list = list(df.drop(copied_attr, 1))
 
-    training_set, validation_set, test_set = separate_set_seq(df, 90, 9, 1)
+    training_set = df
 
     training_set = clean_data(training_set, attr_list)
-    validation_set = clean_data(validation_set, attr_list)
 
     copied_attr.remove("Time")
     training_set.reset_index(drop=True, inplace=True)
-    validation_set.reset_index(drop=True, inplace=True)
 
     config = get_config(attr_list, copied_attr)
 
+    results = []
     if config["load_file"] is None:
-        model = PersistenceModel(config)
-        #model.train(training_set, validation_set, plotLoss=True)
-        #apr = cProfile.Profile()
-        #pr.enable()
-        model.test_variables_mutivariate_model(validation_set, ["target_Wind average [m/s]", "target_Power average [kW]"], "/cluster/home/arc/bjl31/propre/predicted-truth-%s" % (timetoday))
+        for run in range(5):
+            idx = len(training_set) * run // 5
+            limit = len(training_set) * (run + 1) // 5
+            validation_set = training_set.loc[np.arange(idx, limit).tolist()]
+            indices = []
+            indices.extend(np.arange(limit, len(training_set)).tolist())
+            indices.extend(np.arange(idx))
+            train_set = training_set.loc[indices]
+            train_set.reset_index(drop=True, inplace=True)
+            validation_set.reset_index(drop=True, inplace=True)
+            model = PaddingModel(config)
+            model.train(train_set, validation_set, plotLoss=True)
+            #apr = cProfile.Profile()
+            #pr.enable()
+            res = model.test_variables_mutivariate_model(validation_set, ["target_Wind average [m/s]", "target_Power average [kW]"]) #"/cluster/home/arc/bjl31/propre/predicted-truth-%s" % (timetoday)
+            res = [x for var in res for x in var]
+            results.append(res)
+        mse = [x[0] for x in results]
+        mae = [x[1] for x in results]
+        print(mae)
+        print(mse)
+        print(sum(mae) / float(len(mae)))
+        print(sum(mse) / float(len(mse)))
         #model.save("/cluster/home/arc/bjl31/propre/model_of-%s.h5" % timetoday)
         #model.output_as_input_testing(validation_set)
         #pr.disable()
         # after your program ends
         #pr.print_stats(sort="line")
-        exit(0)
 
     else:
         model = load_model(config["load_file"])

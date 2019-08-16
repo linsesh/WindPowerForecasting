@@ -4,6 +4,8 @@ from preprocessing import *
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from run import get_config
+from visualization import plot_predicted_vs_truth
+from random import randrange
 
 df = read_file(sys.argv[1])
 
@@ -19,10 +21,10 @@ history = [x for x in training_set[target_variable]]
 test_set = test_set[target_variable]
 validation_set = validation_set[target_variable]
 
-model = SARIMAX(history, order=(18,1,1))
+model = SARIMAX(history, order=(1,1,1))
 model_fit = model.fit(disp=0)
 
-real_model = SARIMAX(validation_set, order=(18,1,1))
+real_model = SARIMAX(validation_set, order=(1,1,1))
 res = real_model.filter(model_fit.params)
 
 config = get_config(None, None)
@@ -46,4 +48,6 @@ mae = mean_absolute_error(observations, predictions)
 print('Test MAE: %.3f' % mae)
 order = abs((mae / validation_set.mean()) * 100)
 print("Error of order : %d%%" % order)
+idx = randrange(len(observations))
+plot_predicted_vs_truth(predictions[idx:idx+72], observations[idx:idx+72], validation_set.min(), validation_set.max())
 # plot

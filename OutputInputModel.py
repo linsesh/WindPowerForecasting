@@ -83,6 +83,7 @@ class OutputInputModel(base_model):
         skip = config["skip_steps"]
         for n in range((len(validation_set) - (config["forecast_steps"] + config["time_steps"])) // skip):
             x = np.zeros((1, config["time_steps"], len(config["attr"])))
+            model.reset_states()
             for t in range(config["forecast_steps"]):
                 x[0, :config["time_steps"] - t, :] = validation_set.loc[n * skip + t:n * skip + config["time_steps"] - 1,
                                                      config["attr"]]
