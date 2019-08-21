@@ -1,7 +1,7 @@
 # WindPowerForecasting
 Forecast wind power and electricity production of wind turbines
 
-This repository contains several models and allows to easily modify several hyper parameters.
+This repository contains several models and allows to easily modify some hyper parameters.
 
 ### KerasBatchGenerator
 Classic batch generator to configure, which provide inputs and teaching signals
