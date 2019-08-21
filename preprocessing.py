@@ -11,7 +11,7 @@ def read_file(name):
     return df
 
 def normalize(df):
-    df_norm = (df - df.mean()) / (df.max() - df.min())
+    #df_std = (df - df.mean()) / (df.max() - df.min())
     #print(df_norm.mean())
     #print(df_norm.std())
     df_std = (df - df.mean()) / df.std()

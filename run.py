@@ -13,16 +13,16 @@ import numpy as np
 #to put in a json file, more pratical
 def get_config(attr, output):
     return {
-    "batch_size": 35,
+    "batch_size": 100,
     "attr": attr,
     "target_variable": output,
     "time_steps": 36, #use 12 last hours
-    "forecast_steps": 72, # to predict 6 next hour
+    "forecast_steps": 1, # to predict 6 next hour
     "num_epochs": 8,
     "skip_steps": 5,
     "hidden_size": 500,
     "load_file": None,
-    "regularizer": regularizers.l2(0.01) #for now
+    "regularizer": None
     }
 
 def main():
@@ -39,10 +39,10 @@ def main():
     pd.set_option('display.width', 2000)
 
     #df = collapse_data(df, window=3)
-    df = arrange_data(df)
+    #df = arrange_data(df)
     #output_list = ["Wind average [m/s]"]
-    output_list = list(df.drop(["Time", "month", "hour", "day"], 1))
-    #output_list = list(df.drop(["Time"], 1))
+    #output_list = list(df.drop(["Time", "month", "hour", "day"], 1))
+    output_list = list(df.drop(["Time"], 1))
 
     df, copied_attr = copy_target(df, output_list)
 
@@ -59,6 +59,7 @@ def main():
     config = get_config(attr_list, copied_attr)
 
     results = []
+    tested_variables = ["target_Wind average [m/s]", "target_Power average [kW]"]
     if config["load_file"] is None:
         for run in range(5):
             idx = len(training_set) * run // 5
@@ -69,20 +70,22 @@ def main():
             indices.extend(np.arange(idx))
             train_set = training_set.loc[indices]
             train_set.reset_index(drop=True, inplace=True)
+            print(len(train_set))
             validation_set.reset_index(drop=True, inplace=True)
-            model = PaddingModel(config)
+            model = OutputInputModel(config)
             model.train(train_set, validation_set, plotLoss=True)
             #apr = cProfile.Profile()
             #pr.enable()
-            res = model.test_variables_mutivariate_model(validation_set, ["target_Wind average [m/s]", "target_Power average [kW]"]) #"/cluster/home/arc/bjl31/propre/predicted-truth-%s" % (timetoday)
-            res = [x for var in res for x in var]
+            res = model.output_as_input_testing(validation_set, tested_variables, forecast_steps=72) #"/cluster/home/arc/bjl31/propre/predicted-truth-%s" % (timetoday)
             results.append(res)
-        mse = [x[0] for x in results]
-        mae = [x[1] for x in results]
-        print(mae)
-        print(mse)
-        print(sum(mae) / float(len(mae)))
-        print(sum(mse) / float(len(mse)))
+        for i in range(len(tested_variables)):
+            var_res = [x[i] for x in results]
+            mse = [x[0] for x in var_res]
+            mae = [x[1] for x in var_res]
+            print(mae)
+            print(mse)
+            print(sum(mae) / float(len(mae)))
+            print(sum(mse) / float(len(mse)))
         #model.save("/cluster/home/arc/bjl31/propre/model_of-%s.h5" % timetoday)
         #model.output_as_input_testing(validation_set)
         #pr.disable()

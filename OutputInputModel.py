@@ -68,64 +68,79 @@ class OutputInputModel(base_model):
         if plotLoss:
             self.plot_infos(history)
 
-    def output_as_input_testing(self, validation_set, variable_to_test, stateful=True):
+    def output_as_input_testing(self, validation_set, variables_to_test, stateful=True, forecast_steps=None):
+        config = self.config
+        config["batch_size"] = 1
         if stateful:
-            model = self.get_stateful_model(self.config)
+            model = self.get_stateful_model(config)
             model.set_weights(self.model.get_weights())
         else:
             model = self.model
-        config = self.config
 
+        if forecast_steps is None:
+            forecast = config["forecast_steps"]
+        else:
+            forecast = forecast_steps
         predictions = []
-        var_prediction = []
-        truth_values = []
+        var_prediction = {}
+        truth_values = {}
+        for x in variables_to_test:
+            var_prediction[x] = []
+            truth_values[x] = []
         variables = validation_set[config["target_variable"]]
         skip = config["skip_steps"]
-        for n in range((len(validation_set) - (config["forecast_steps"] + config["time_steps"])) // skip):
+        for n in range((len(validation_set) - (forecast + config["time_steps"])) // skip):
             x = np.zeros((1, config["time_steps"], len(config["attr"])))
             model.reset_states()
-            for t in range(config["forecast_steps"]):
-                x[0, :config["time_steps"] - t, :] = validation_set.loc[n * skip + t:n * skip + config["time_steps"] - 1,
-                                                     config["attr"]]
+            for t in range(forecast):
+                if t < config["time_steps"]:
+                    x[0, :config["time_steps"] - t, :] = validation_set.loc[n * skip + t:n * skip + config["time_steps"] - 1,
+                                                         config["attr"]]
                 if t > 0:
                     #print(predictions[n * 6:n * 6 + t])
                     #print([normalize_from_df(x, validation_set.loc[:, config["target_variable"]]) for x in
                     # predictions[n * 6:n * 6 + t]])
                     try:
-                        x[0, config["time_steps"] - t:, :] =\
-                            [normalize_from_df(x, variables)
-                                    for x in predictions[n * skip:n * skip + t]]
+                        pred = [normalize_from_df(x, variables)
+                                    for x in predictions[n * skip + ((t // config["time_steps"]) * t % config["time_steps"]) :n * skip + t]]
+                        if t < config["time_steps"]:
+                            x[0, config["time_steps"] - t:, :] = pred
+                        else:
+                            x[0, :, :] = pred
+
                     except Exception as e:
                         print(e)
                         print("n = %d t = %d" % (n, t))
+                        print("hey : ")
+                        print([normalize_from_df(x, variables)
+                                    for x in predictions[n * skip:n * skip + t]])
                         print(predictions[n * skip:n * skip + t])
+                        exit(0)
+
 
                 prediction = model.predict(x)
+                predictions.append(prediction[0])#HEIN ? ptet bon mais bon
+
                 #exit(0)
-                predictions.append(prediction[0])
-                var_prediction.append(prediction[0][config["target_variable"].index(variable_to_test)])
-                truth_values.append(validation_set.loc[n * skip + config["time_steps"] + t, variable_to_test])
+                for var in variables_to_test:
+                    var_prediction[var].append(prediction[0][config["target_variable"].index(var)])
+                    truth_values[var].append(validation_set.loc[n * skip + config["time_steps"] + t, var])
             #print(predictions)
             #print(truth_values)
             #print(validation_set.loc[34:40])
             #exit(0)
         #print(truth_values)
         #print(var_prediction)
-        print(var_prediction[0:36])
-        print(truth_values[0:36])
-        print("")
-        print(var_prediction[36:72])
-        print(truth_values[36:72])
-        print("")
-        print(var_prediction[72:108])
-        print(truth_values[72:108])
-        print("")
-        error = mean_squared_error(truth_values, var_prediction)
-        print('Test MSE: %.3f' % error)
-        mae = mean_absolute_error(truth_values, var_prediction)
-        print('Test MAE: %.3f' % mae)
-        order = abs((mae / validation_set[variable_to_test].mean()) * 100)
-        print("Error of order : %d%%" % order)
+        ret = []
+        for var in variables_to_test:
+            mse = mean_squared_error(truth_values[var], var_prediction[var])
+            print('Test MSE: %.3f' % mse)
+            mae = mean_absolute_error(truth_values[var], var_prediction[var])
+            print('Test MAE: %.3f' % mae)
+            order = abs((mae / validation_set[var].mean()) * 100)
+            print("Error of order : %d%%" % order)
+            ret.append((mae, mse))
+        return ret
 
 
 #if t == 35:
