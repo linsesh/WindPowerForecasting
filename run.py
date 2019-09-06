@@ -1,6 +1,5 @@
 import pandas as pd
 import sys
-from keras import regularizers
 from preprocessing import *
 from PaddingModel import PaddingModel
 from OutputInputModel import OutputInputModel
@@ -9,21 +8,8 @@ from keras.models import load_model
 import cProfile
 from time import gmtime, strftime
 import numpy as np
-
-#to put in a json file, more pratical
-def get_config(attr, output):
-    return {
-    "batch_size": 100,
-    "attr": attr,
-    "target_variable": output,
-    "time_steps": 36, #use 12 last hours
-    "forecast_steps": 1, # to predict 6 next hour
-    "num_epochs": 8,
-    "skip_steps": 5,
-    "hidden_size": 500,
-    "load_file": None,
-    "regularizer": None
-    }
+from arima import fit_arima
+from config import get_config
 
 def main():
     if len(sys.argv) == 1:

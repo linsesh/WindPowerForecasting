@@ -4,9 +4,10 @@ from preprocessing import *
 from pandas.plotting import autocorrelation_plot
 import numpy as np
 
-def plot_predicted_vs_truth(predicted, truth, miny, maxy, name=None):
-    plt.plot([x for x in range(len(predicted))], predicted, label='predicted')
-    plt.plot([x for x in range(len(predicted))], truth, label='truth')
+def plot_predicted_vs_truth(predicted, labels, truth, miny, maxy, name=None):
+    for pred, label in zip(predicted, labels):
+        plt.plot([x for x in range(len(pred))], pred, label=label)
+    plt.plot([x for x in range(len(truth))], truth, label='truth')
     axes = plt.gca()
     axes.set_ylim([miny, maxy])
     plt.legend()
@@ -28,7 +29,9 @@ if __name__ == "__main__":
     df = read_file(sys.argv[1])
     df = arrange_data(df)
 
-    plot_relation_power_output(df, "hour")
+    autocorrelation_plot(df["Wind average [m/s]"][0:100])
+    plt.show()
+    #plot_relation_power_output(df, "hour")
 
 #print(df["Power average [kW]"].mean())
 #print(df["Wind average [m/s]"].mean())

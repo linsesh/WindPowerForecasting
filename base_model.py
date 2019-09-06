@@ -58,7 +58,7 @@ class base_model:
                                       verbose=1)
         print("error on test set: [%s]" % ', '.join(map(str, ev)))
 
-    def test_variables_mutivariate_model(self, validation_set, variables_to_test, plotName=None):
+    def test_variables_mutivariate_model(self, validation_set, variables_to_test, oresults, olabels, plotName=None):
         model = self.model
         config = self.config
         skip = config["skip_steps"]
@@ -90,7 +90,9 @@ class base_model:
             idx = randrange(len(observations[x]))
             idx = idx - 72 if idx + 72 > len(observations[x]) else idx
             ret.append((mae, mse))
-            #plot_predicted_vs_truth(predictions[x][idx:idx+72], observations[x][idx:idx+72], validation_set[x].min(), validation_set[x].max(), plotName)
+            oresults.append(predictions[x][17434:17434 + 72])
+            olabels.append("LSTM")
+            plot_predicted_vs_truth(oresults, olabels, observations[x][17434:17434+72], validation_set[x].min(), validation_set[x].max(), plotName)
         return ret
 
 
